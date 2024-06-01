@@ -6,6 +6,8 @@ sleepDelay: .word 05
 addrOffset: .byte 0
 offsetCount: .word 0
 testOffset: .word 200
+screenPos: .byte 0
+msgPos: .byte 0
 
 .macro sleep(sleepTime) {
 sleep:
@@ -16,12 +18,9 @@ sleep:
 }
 
 .macro setDelay(delay) {
-  inx
-  txa
-  ldy testOffset
-  sta $0400,y
+  ldy msgPos
   iny
-  sty testOffset 
+  sty msgPos
   lda delay
   sta sleepDelay
   rts
@@ -65,18 +64,25 @@ msg:
   .text "test"
   .byte 0
 cont:
+  ldx msgPos
   lda msg,x
+  ldx screenPos
   sta $0400,x
   jsr checkNextChar
+  ldy screenPos
+  iny
+  sty screenPos
   ldy #$00
   sty counter
   sleep(sleepDelay)
 checkNextChar:
+  ldx msgPos
   inx 
+  stx msgPos
   lda msg,x
   cmp #$00
   beq quit
-  cmp #$01  // Period check
+  cmp #$01  
   beq slower
   cmp #$02
   beq faster
