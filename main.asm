@@ -10,7 +10,20 @@ screenPos: .byte 0
 msgPos: .byte 0
 
 
-//draw text macro
+//     draw text macro
+//
+// .data 1 initializes a sleep
+// the following .data is used for sleep in interrupts
+// 50 = 1000ms
+// 25 = 500ms
+// msToFrames :: Milliseconds -> InterruptCycles
+// msToFrames MS = (50/1000 * MS)
+//
+// .data 3 initializes a pause until any key is pressed
+//
+// .data 0 quits the macro call, all msgs must be 0-terminated!
+//
+
 .macro drawText(msg, msgPosition, screenPosition) {
 //main loop
 cont:
@@ -20,7 +33,7 @@ cont:
   inx
   stx msgPosition
   ldx screenPos
-  sta screenPosition,x
+  sta screenPosition,x   // we require a screenPosition and msgPosition, as they fall out of sync.
   inx
   stx screenPos
   ldy #$00
@@ -30,26 +43,18 @@ cont:
   beq ret
   sleep(sleepDelay)
   jmp cont
-checkChar:
+checkChar:      // checking our chars for sleep times and pauses
   ldx msgPosition
   lda msg,x
   cmp #$03
   beq pause
-  cmp #$00
+  cmp #$00      // end of message (msgs must be 0 terminated!)
   beq ret
   cmp #$01
   beq sleepChange
   stx msgPos
   rts
-//
-// .data 1 initializes a sleep
-// the following .data is used for sleep in interrupts
-// 50 = 1000ms
-// 25 = 500ms
-// msToFrames :: Milliseconds -> InterruptCycles
-// msToFrames MS = (50/1000 * MS)
-//
-sleepChange:
+sleepChange:     // changes our sleep delay based on finding #$01
   ldx msgPos
   inx
   lda msg,x
@@ -137,13 +142,13 @@ initMsg:
   jmp *
 
 /////////////////////
-      msg data
+//     msg data    //
 ////////////////////
 msg:
   .text "hello world"
-  .byte $03
-  .byte $01
-  .byte $30
+  .byte $03    // pause until key pressed
+  .byte $01    // change sleep timer
+  .byte $30    // sleep timer speed
   .text "..."
   .byte $01
   .byte $05
@@ -151,14 +156,18 @@ msg:
   .byte 0
 
 msg2:
+  .byte $01
+  .byte $50
   .text "testing!"
   .byte 0
 ///////////////////////
-     end msg data
+//    end msg data   //
 ///////////////////////
 
 
 //example main
+//ill add milestone RAM addresses later
+//i.e., bottom 4 lines for ADV-style text.
 main:
   drawText(msg, msgPos, $0400)
   drawText(msg2,msgPos, $0500)
