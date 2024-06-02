@@ -18,12 +18,8 @@ sleep:
 }
 
 .macro setDelay(delay) {
-  ldy msgPos
-  iny
-  sty msgPos
   lda delay
   sta sleepDelay
-  rts
 }
 
 int:
@@ -58,41 +54,60 @@ initMsg:
   jmp *
 msg:
   .text "hello world"
+  .byte $03
   .byte $01
   .text "..."
   .byte $02
   .text "test"
   .byte 0
+// loop
 cont:
+  jsr checkChar
   ldx msgPos
   lda msg,x
+  inx
+  stx msgPos
   ldx screenPos
   sta $0400,x
-  jsr checkNextChar
-  ldy screenPos
-  iny
-  sty screenPos
+  inx
+  stx screenPos
   ldy #$00
   sty counter
   sleep(sleepDelay)
-checkNextChar:
+checkChar:
   ldx msgPos
-  inx 
-  stx msgPos
   lda msg,x
+  cmp #$03
+  beq pause
   cmp #$00
   beq quit
-  cmp #$01  
+  cmp #$01  // Period check
   beq slower
   cmp #$02
   beq faster
+  stx msgPos
   rts
 slower:
   setDelay(50)
-  rts
+  ldx msgPos
+  inx
+  stx msgPos
+  jmp checkChar
 faster:
   setDelay(25)
-  rts
+  ldx msgPos
+  inx
+  stx msgPos
+  jmp checkChar
+pause:
+  jsr $ff9f
+  jsr $ffe4
+  cmp #$0
+  beq pause
+  ldx msgPos
+  inx
+  stx msgPos
+  jmp checkChar
 // cases for various sleeps
 quit:
  jmp quit
