@@ -9,12 +9,87 @@ testOffset: .word 200
 screenPos: .byte 0
 msgPos: .byte 0
 
+
+//draw text macro
+.macro drawText(msg, msgPosition, screenPosition) {
+//main loop
+cont:
+  jsr checkChar
+  ldx msgPosition
+  lda msg,x
+  inx
+  stx msgPosition
+  ldx screenPos
+  sta screenPosition,x
+  inx
+  stx screenPos
+  ldy #$00
+  sty counter
+  lda msg,x
+  cmp #$0
+  beq ret
+  sleep(sleepDelay)
+  jmp cont
+checkChar:
+  ldx msgPosition
+  lda msg,x
+  cmp #$03
+  beq pause
+  cmp #$00
+  beq ret
+  cmp #$01
+  beq sleepChange
+  stx msgPos
+  rts
+//
+// .data 1 initializes a sleep
+// the following .data is used for sleep in interrupts
+// 50 = 1000ms
+// 25 = 500ms
+// msToFrames :: Milliseconds -> InterruptCycles
+// msToFrames MS = (50/1000 * MS)
+//
+sleepChange:
+  ldx msgPos
+  inx
+  lda msg,x
+  sta sleepDelay
+  inx 
+  stx msgPos
+  jmp checkChar
+slower:
+  setDelay(50)
+  ldx msgPos
+  inx
+  stx msgPos
+  jmp checkChar
+faster:
+  setDelay(25)
+  ldx msgPos
+  inx
+  stx msgPos
+  jmp checkChar
+pause:
+  jsr $ff9f
+  jsr $ffe4
+  cmp #$0
+  beq pause
+  ldx msgPos
+  inx
+  stx msgPos
+  jmp checkChar
+ret:
+  lda #$0
+  sta screenPos
+  sta msgPos
+}
+
 .macro sleep(sleepTime) {
 sleep:
   lda sleepTime
   cmp counter
-  beq cont
-  jmp sleep
+  bne sleep
+  
 }
 
 .macro setDelay(delay) {
@@ -22,11 +97,17 @@ sleep:
   sta sleepDelay
 }
 
+//setup raster interrupt
+//will make macro later for different required interrupts :)
 int:
+  jsr $ff9f
+  jsr $ffe4
+  cmp #$0
   inc $d019
-  inc counter // on interrupt, inc counter
+  inc counter
   jmp $ea81
-// setting raster interrupt
+
+//initialize raster interrupt
 raster:
   sei
   lda #$7f
@@ -43,88 +124,47 @@ raster:
   lda #$01
   sta $d01a
   cli
-// setting background and border
+//background changes
 initMsg: 
   lda #$00
-  sta $d020     // background
-  sta $d021     // border
+  sta $d020 //background
+  sta $d021 //border
   lda #$01
-  sta $0286     // cursor
-  jsr $e544     // cls
+  sta $0286 //cursor
+  jsr $e544 //CLS
   ldx #$00
-  jsr cont
+  jsr main
   jmp *
 
-// msg data
-// an alternative method would be:
-// .text "hello world"
-// .byte $01 (indicating a change in speed)
-// .byte $## (where ## is our interrupts to sleep)
-// [...]
-// cmp #$01
-// jeq sleepDelaySet
-// sleepDelaySet:
-// inx
-// stx sleepDelay
-// --
-// Thus, our sleep delay is indicated in the msg itself. ill try this later :) its elegant.
+/////////////////////
+      msg data
+////////////////////
 msg:
   .text "hello world"
-  .byte $03     //  byte 3 is pause
-  .byte $01     //  byte 1 is slower 
+  .byte $03
+  .byte $01
+  .byte $30
   .text "..."
-  .byte $02
+  .byte $01
+  .byte $05
   .text "test"
   .byte 0
-// loop
-cont:
-  jsr checkChar
-  ldx msgPos
-  lda msg,x
-  inx
-  stx msgPos
-  ldx screenPos
-  sta $0400,x
-  inx
-  stx screenPos
-  ldy #$00
-  sty counter
-  sleep(sleepDelay)
-// checking char for speed and sleep-related data
-checkChar:
-  ldx msgPos
-  lda msg,x
-  cmp #$03
-  beq pause
-  cmp #$00
-  beq quit
-  cmp #$01  // Period check
-  beq slower
-  cmp #$02
-  beq faster
-  stx msgPos
+
+msg2:
+  .text "testing!"
+  .byte 0
+///////////////////////
+     end msg data
+///////////////////////
+
+
+//example main
+main:
+  drawText(msg, msgPos, $0400)
+  drawText(msg2,msgPos, $0500)
   rts
-slower:
-  setDelay(50)
-  ldx msgPos
-  inx
-  stx msgPos
-  jmp checkChar
-faster:
-  setDelay(25)
-  ldx msgPos
-  inx
-  stx msgPos
-  jmp checkChar
-// pause until any key is read
-pause:
-  jsr $ff9f
-  jsr $ffe4
-  cmp #$0
-  beq pause
-  ldx msgPos
-  inx
-  stx msgPos
-  jmp checkChar
+
+
+// quit
 quit:
  jmp quit
