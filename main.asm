@@ -16,13 +16,16 @@ msgPos: .byte 0
 // the following .data is used for sleep in interrupts
 // 50 = 1000ms
 // 25 = 500ms
-// msToFrames :: Milliseconds -> InterruptCycles
-// msToFrames MS = (50/1000 * MS)
 //
 // .data 3 initializes a pause until any key is pressed
 //
 // .data 0 quits the macro call, all msgs must be 0-terminated!
 //
+
+// toMs :: Milliseconds -> InterruptCycles
+.function toMs(X){
+  .return round((50/1000)*X)  
+}
 
 .macro drawText(msg, msgPosition, screenPosition) {
 //main loop
@@ -148,16 +151,16 @@ msg:
   .text "hello world"
   .byte $03    // pause until key pressed
   .byte $01    // change sleep timer
-  .byte $30    // sleep timer speed
+  .byte $30    // sleep timer speed in interrupts
   .text "..."
   .byte $01
-  .byte $05
+  .byte toMs(200) // sleep timer speed in Ms
   .text "test"
   .byte 0
 
 msg2:
   .byte $01
-  .byte $50
+  .byte toMs(50)
   .text "testing!"
   .byte 0
 ///////////////////////
@@ -171,7 +174,7 @@ msg2:
 main:
   drawText(msg, msgPos, $0400)
   drawText(msg2,msgPos, $0500)
-  rts
+  jmp quit
 
 
 // quit
