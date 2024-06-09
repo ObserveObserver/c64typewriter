@@ -10,6 +10,9 @@ screenPos: .byte 0
 msgPos: .byte 0
 
 
+// USING A MACRO HERE IS ACTUALLY PANTS ON HEAD FUCKTARDED LOL ITS WAY TOO BIG AND COMMON
+// ILL CHANGE THIS TOMORROW (NOTE SO I DONT FORGET XD)
+
 //     draw text macro
 //
 // .data 1 initializes a sleep
