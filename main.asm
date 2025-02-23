@@ -1,19 +1,24 @@
 BasicUpstart2(raster)
 
+// zeropage pointers
+*=$FB virtual
+.zp {
+wrdPntLo: .byte 0
+wrdPntHi: .byte 0
+scrPntLo: .byte 0
+scrPntHi: .byte 0
+}
+
+// vars
 * = $4000
 counter: .word 0
 sleepDelay: .word 05
 addrOffset: .byte 0
 offsetCount: .word 0
-testOffset: .word 200
 screenPos: .byte 0
 msgPos: .byte 0
 
-
-// USING A MACRO HERE IS ACTUALLY PANTS ON HEAD FUCKTARDED LOL ITS WAY TOO BIG AND COMMON
-// ILL CHANGE THIS TOMORROW (NOTE SO I DONT FORGET XD)
-
-//     draw text macro
+//     draw text
 //
 // .data 1 initializes a sleep
 // the following .data is used for sleep in interrupts
@@ -30,77 +35,75 @@ msgPos: .byte 0
   .return round((50/1000)*X)  
 }
 
-.macro drawText(msg, msgPosition, screenPosition) {
-//main loop
 cont:
   jsr checkChar
-  ldx msgPosition
-  lda msg,x
-  inx
-  stx msgPosition
-  ldx screenPos
-  sta screenPosition,x   // we require a screenPosition and msgPosition, as they fall out of sync.
-  inx
-  stx screenPos
+  ldy msgPos
+  lda (wrdPntLo),y
+  iny
+  sty msgPos
+  ldy screenPos
+  sta (scrPntLo),y   // we require a screenPosition and msgPosition, as they fall out of sync.
+  iny
+  sty screenPos
   ldy #$00
   sty counter
-  lda msg,x
+  ldy msgPos
+  lda (wrdPntLo),y
   cmp #$0
   beq ret
   sleep(sleepDelay)
   jmp cont
 checkChar:      // checking our chars for sleep times and pauses
-  ldx msgPosition
-  lda msg,x
+  ldy msgPos
+  lda (wrdPntLo),y
   cmp #$03
   beq pause
   cmp #$00      // end of message (msgs must be 0 terminated!)
   beq ret
   cmp #$01
   beq sleepChange
-  stx msgPos
+  sty msgPos 
   rts
 sleepChange:     // changes our sleep delay based on finding #$01
-  ldx msgPos
-  inx
-  lda msg,x
+  ldy msgPos
+  iny
+  lda (wrdPntLo),y
   sta sleepDelay
-  inx 
-  stx msgPos
+  iny
+  sty msgPos
   jmp checkChar
 slower:
   setDelay(50)
-  ldx msgPos
-  inx
-  stx msgPos
+  ldy msgPos
+  iny
+  sty msgPos
   jmp checkChar
 faster:
   setDelay(25)
-  ldx msgPos
-  inx
-  stx msgPos
+  ldy msgPos
+  iny
+  sty msgPos
   jmp checkChar
 pause:
   jsr $ff9f
   jsr $ffe4
   cmp #$0
   beq pause
-  ldx msgPos
-  inx
-  stx msgPos
+  ldy msgPos
+  iny
+  sty msgPos
   jmp checkChar
 ret:
   lda #$0
   sta screenPos
   sta msgPos
-}
+  rts
 
 .macro sleep(sleepTime) {
 sleep:
   lda sleepTime
   cmp counter
   bne sleep
-  
 }
 
 .macro setDelay(delay) {
@@ -111,9 +114,6 @@ sleep:
 //setup raster interrupt
 //will make macro later for different required interrupts :)
 int:
-  jsr $ff9f
-  jsr $ffe4
-  cmp #$0
   inc $d019
   inc counter
   jmp $ea81
@@ -135,7 +135,6 @@ raster:
   lda #$01
   sta $d01a
   cli
-//background changes
 initMsg: 
   lda #$00
   sta $d020 //background
@@ -145,12 +144,34 @@ initMsg:
   jsr $e544 //CLS
   ldx #$00
   jsr main
-  jmp *
 
-/////////////////////
-//     msg data    //
-////////////////////
-msg:
+// loads pointers for use in cont:
+// can u believe oldheads had to write this out manually every time?
+.macro drawText(msgInput, scr) {
+  lda #<msgInput
+  sta wrdPntLo
+  lda #>msgInput
+  sta wrdPntHi
+  lda #<scr
+  sta scrPntLo
+  lda #>scr
+  sta scrPntHi
+  jsr cont
+}
+
+main:
+  drawText(msg,$0400)
+  drawText(msg2,$0600)
+  jsr cont
+  jmp quit1
+
+// quit
+quit1:
+ jmp quit1
+
+// messages
+ * = $5002
+ msg:
   .text "hello world"
   .byte $03    // pause until key pressed
   .byte $01    // change sleep timer
@@ -166,20 +187,3 @@ msg2:
   .byte toMs(50)
   .text "testing!"
   .byte 0
-///////////////////////
-//    end msg data   //
-///////////////////////
-
-
-//example main
-//ill add milestone RAM addresses later
-//i.e., bottom 4 lines for ADV-style text.
-main:
-  drawText(msg, msgPos, $0400)
-  drawText(msg2,msgPos, $0500)
-  jmp quit
-
-
-// quit
-quit:
- jmp quit
